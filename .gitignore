@@ -1,0 +1,69 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# uv / pip
+uv.lock
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+.DS_Store
+tempCodeRunnerFile.py
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Claude / Cursor
+.claude/
+.cursor/
+
+# Tests / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Hidden state dumps (can be GBs)
+*.pt
+*.safetensors
+
+# Large archives
+*.zip
+*.tar
+*.tar.gz
+*.7z
+
+# Generated figures / large CSVs (keep small example data only)
+results/
+outputs/
+*.png
+*.jpg
+*.jpeg
+*.pdf
+!docs/**/*.png
+!docs/**/*.pdf
+
+# Per-paper figure source data exceeds typical limits
+figures/source_data/
+
+# OS junk
+Thumbs.db
+desktop.ini

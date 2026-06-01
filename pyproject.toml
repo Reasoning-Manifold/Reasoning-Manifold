@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "reasoning-manifolds"
+version = "0.1.0"
+description = "Reasoning emerges from constrained inference manifolds in large language models"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [
+    { name = "Yanbiao Ma" },
+    { name = "Fei Luo" },
+    { name = "Linfeng Zhang" },
+]
+keywords = ["llm", "reasoning", "intrinsic-dimension", "interpretability", "manifold"]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "accelerate>=1.0",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "perceptual-manifold-geometry>=0.1.4",
+    "torch>=2.4",
+    "tqdm>=4.66",
+    "transformers>=4.45",
+]
+
+[project.optional-dependencies]
+tp = ["tensor-parallel>=2.0"]
+
+[project.scripts]
+reasoning-manifolds = "reasoning_manifolds.pipeline.launcher:main"
+
+[project.urls]
+Paper = "https://arxiv.org/abs/2605.08142"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/reasoning_manifolds"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
