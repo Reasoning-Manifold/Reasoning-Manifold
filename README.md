@@ -17,7 +17,7 @@ H = log(D_world) · V / exp(ε · D_stim),   ε = 0.1
 ## Installation
 
 ```bash
-git clone https://github.com/<org>/reasoning-manifolds.git
+https://github.com/Reasoning-Manifold/Reasoning-Manifold
 cd reasoning-manifolds
 pip install -e .
 ```
