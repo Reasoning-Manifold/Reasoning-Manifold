@@ -1,7 +1,3 @@
-"""Common utilities (seeding, GPU allocation, logging)."""
-
-from __future__ import annotations
-
 import logging
 import os
 import random
@@ -27,12 +23,10 @@ def set_seed(seed: int) -> None:
 
 
 def model_short_name(model_id: str) -> str:
-    """Return the trailing path component of a HF id or local path."""
     return os.path.basename(model_id.rstrip("/")) or os.path.basename(os.path.dirname(model_id))
 
 
 def allocate_gpus(tp: int, dp: int) -> list[list[int]]:
-    """Split contiguous GPUs into ``dp`` groups of ``tp`` devices each."""
     total = torch.cuda.device_count()
     if tp * dp != total:
         raise ValueError(f"GPU allocation: TP({tp})·DP({dp}) = {tp * dp} != {total} GPUs available")

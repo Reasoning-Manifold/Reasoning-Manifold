@@ -1,12 +1,3 @@
-"""Stimulus / dataset loaders.
-
-The paper draws inference-time stimuli from MMLU-Other, partitioned into
-13 disjoint question types for the stimulus-expansion experiment. Other
-benchmarks (AIME'25, GPQA-Diamond) follow the same JSONL schema.
-"""
-
-from __future__ import annotations
-
 import json
 import logging
 from dataclasses import dataclass
@@ -18,14 +9,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Stimulus:
-    """One stimulus / question with optional choices and ground truth."""
-
     id: str | int
     question: str
     choices: list[str] | None = None
     answer: str | int | None = None
 
 
+# field aliases tolerated across MMLU / AIME / GPQA dumps
 _QUESTION_KEYS = ("question", "problem", "Question")
 _ANSWER_KEYS = ("answer", "solution", "ground_truth", "Correct Answer")
 
@@ -38,12 +28,6 @@ def _pick(record: dict, keys: Iterable[str]):
 
 
 def load_jsonl(path: str | Path, max_samples: int | None = None) -> list[Stimulus]:
-    """Load a JSONL stimulus file.
-
-    Accepts the union of field names used across MMLU/AIME/GPQA dumps in
-    this project: ``question`` | ``problem``, ``answer`` | ``solution`` |
-    ``ground_truth``, optional ``choices``.
-    """
     path = Path(path)
     out: list[Stimulus] = []
     with path.open("r", encoding="utf-8") as handle:
@@ -73,7 +57,6 @@ def load_jsonl(path: str | Path, max_samples: int | None = None) -> list[Stimulu
 
 
 def iter_jsonl(path: str | Path) -> Iterator[Stimulus]:
-    """Iterate stimuli without holding the whole list in memory."""
     path = Path(path)
     with path.open("r", encoding="utf-8") as handle:
         for idx, raw in enumerate(handle):

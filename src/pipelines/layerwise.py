@@ -1,25 +1,3 @@
-"""Layer-wise extraction script: dump per-sample, per-layer hidden states.
-
-This is the analogue of ``Layer-ID/hs_layer.py`` and ``hs_layer_gemma.py``,
-needed to reproduce the per-layer ID/V curves in Fig 1 and Fig 3B.
-
-Run separately from the multi-repeat pipeline because each sample writes a
-``[num_layers, num_tokens, hidden]`` ``.pt`` file.
-
-Usage::
-
-    python -m reasoning_manifolds.pipeline.layerwise \\
-        --model Qwen/Qwen3-8B \\
-        --dataset data/mmlu_other/sub_other0.jsonl \\
-        --config qwen3 \\
-        --output-dir results/layerwise/
-
-Pair with ``scripts/compute_layerwise_metrics.py`` to turn the dumped ``.pt``
-files into per-layer ID/V CSVs.
-"""
-
-from __future__ import annotations
-
 import argparse
 import gc
 import json
@@ -29,11 +7,16 @@ from pathlib import Path
 import torch
 from tqdm import tqdm
 
-from reasoning_manifolds.data import iter_jsonl
-from reasoning_manifolds.extract import HiddenStateCollector, all_layer_ids, format_chat_input
-from reasoning_manifolds.models import is_gemma, load_model_and_tokenizer
-from reasoning_manifolds.prompts import format_mmlu_prompt, get_decoding_params
-from reasoning_manifolds.utils import configure_logging, model_short_name, set_seed
+from core.data import iter_jsonl
+from inference.decoding import get_decoding_params
+from inference.extract import (
+    HiddenStateCollector,
+    all_layer_ids,
+    format_chat_input,
+)
+from inference.models import is_gemma, load_model_and_tokenizer
+from inference.prompts import format_mmlu_prompt
+from utils import configure_logging, model_short_name, set_seed
 
 logger = logging.getLogger(__name__)
 

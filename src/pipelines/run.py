@@ -1,19 +1,3 @@
-"""Top-level launcher: spawn workers, then aggregate.
-
-Entry point for the ``reasoning-manifolds`` console script.
-
-Usage::
-
-    reasoning-manifolds run \\
-        --model Qwen/Qwen3-8B \\
-        --dataset data/mmlu_other/sub_other0.jsonl \\
-        --config qwen3 \\
-        --tp 1 --dp 1 --repeats 1 \\
-        --output-dir results/qwen3-8b/
-"""
-
-from __future__ import annotations
-
 import argparse
 import os
 import shutil
@@ -24,57 +8,46 @@ from pathlib import Path
 
 import torch
 
-from reasoning_manifolds.pipeline.aggregator import aggregate
-from reasoning_manifolds.utils import (
+from core.metrics import EPSILON_DEFAULT
+from pipelines._aggregate import aggregate
+from utils import (
     allocate_gpus,
     allocate_repeats,
     configure_logging,
     ensure_dir,
     model_short_name,
 )
-from reasoning_manifolds.metrics import EPSILON_DEFAULT
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(prog="reasoning-manifolds")
-    sub = p.add_subparsers(dest="command", required=True)
-
-    run = sub.add_parser("run", help="extract hidden states and compute D_world / D_stim / V / H")
-    run.add_argument("--model", required=True, help="HF model id or local path")
-    run.add_argument("--dataset", required=True, help="path to JSONL stimuli")
-    run.add_argument(
+    p = argparse.ArgumentParser(description="Reasoning Manifolds — multi-GPU launcher")
+    p.add_argument("--model", required=True, help="HF model id or local path")
+    p.add_argument("--dataset", required=True, help="path to JSONL stimuli")
+    p.add_argument(
         "--config",
         required=True,
         choices=["qwen3", "qwen2.5", "deepseek", "gemma3", "greedy"],
         help="decoding family (matches paper)",
     )
-    run.add_argument("--tp", type=int, default=1, help="tensor-parallel size")
-    run.add_argument("--dp", type=int, default=1, help="data-parallel size (workers)")
-    run.add_argument("--repeats", type=int, default=1, help="number of generation repeats")
-    run.add_argument("--batch-size", type=int, default=1)
-    run.add_argument("--max-new-tokens", type=int, default=15000, help="paper uses 15000")
-    run.add_argument("--seed", type=int, default=42)
-    run.add_argument(
+    p.add_argument("--tp", type=int, default=1, help="tensor-parallel size")
+    p.add_argument("--dp", type=int, default=1, help="data-parallel size (workers)")
+    p.add_argument("--repeats", type=int, default=1, help="number of generation repeats")
+    p.add_argument("--batch-size", type=int, default=1)
+    p.add_argument("--max-new-tokens", type=int, default=15000, help="paper uses 15000")
+    p.add_argument("--seed", type=int, default=42)
+    p.add_argument(
         "--epsilon",
         type=float,
         default=EPSILON_DEFAULT,
         help="ε in H = log(D_world)·V/exp(ε·D_stim)",
     )
-    run.add_argument("--output-dir", default="./results")
-    run.add_argument(
+    p.add_argument("--output-dir", default="./results")
+    p.add_argument(
         "--keep-temp", action="store_true", help="do not delete the worker temp directory"
     )
-    run.add_argument(
+    p.add_argument(
         "--no-aggregate", action="store_true", help="run workers only; skip the aggregation step"
     )
-
-    agg = sub.add_parser("aggregate", help="aggregate existing worker outputs")
-    agg.add_argument("--temp-dir", required=True)
-    agg.add_argument("--output-dir", required=True)
-    agg.add_argument("--repeats", type=int, required=True)
-    agg.add_argument("--dp", type=int, default=1)
-    agg.add_argument("--epsilon", type=float, default=EPSILON_DEFAULT)
-
     return p.parse_args(argv)
 
 
@@ -97,7 +70,7 @@ def _spawn_worker(
     cmd = [
         sys.executable,
         "-m",
-        "reasoning_manifolds.pipeline.worker",
+        "pipelines._worker",
         "--model",
         args.model,
         "--dataset",
@@ -139,7 +112,8 @@ def _stream(process: subprocess.Popen, prefix: str) -> None:
             print(f"[{prefix}] {line}")
 
 
-def cmd_run(args: argparse.Namespace) -> int:
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(argv)
     configure_logging(prefix="launcher")
 
     if args.tp * args.dp != torch.cuda.device_count():
@@ -206,27 +180,6 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not args.keep_temp:
         shutil.rmtree(paths["temp"], ignore_errors=True)
     return 0
-
-
-def cmd_aggregate(args: argparse.Namespace) -> int:
-    configure_logging(prefix="aggregate")
-    aggregate(
-        temp_dir=Path(args.temp_dir),
-        output_dir=Path(args.output_dir),
-        total_repeats=args.repeats,
-        dp=args.dp,
-        epsilon=args.epsilon,
-    )
-    return 0
-
-
-def main(argv: list[str] | None = None) -> int:
-    args = parse_args(argv)
-    if args.command == "run":
-        return cmd_run(args)
-    if args.command == "aggregate":
-        return cmd_aggregate(args)
-    raise SystemExit(f"unknown command {args.command}")
 
 
 if __name__ == "__main__":

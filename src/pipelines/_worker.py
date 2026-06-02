@@ -1,17 +1,3 @@
-"""Per-process worker: load model, generate, save hidden states.
-
-Spawned by :mod:`reasoning_manifolds.pipeline.launcher`. Sees only the GPUs
-assigned via ``CUDA_VISIBLE_DEVICES`` and processes a contiguous range of
-repeat indices.
-
-Outputs (under ``output_dir/worker_<id>/``):
-    d_world.json            scalar D_world
-    hs_r{R}.pt              dict with per-sample hidden states for repeat R
-    pred_r{R}.jsonl         model completions for repeat R
-"""
-
-from __future__ import annotations
-
 import argparse
 import json
 import logging
@@ -21,17 +7,18 @@ from pathlib import Path
 import torch
 from tqdm import tqdm
 
-from reasoning_manifolds.data import load_jsonl
-from reasoning_manifolds.extract import HiddenStateCollector, format_chat_input
-from reasoning_manifolds.metrics import intrinsic_dimension
-from reasoning_manifolds.models import (
+from core.data import load_jsonl
+from core.metrics import intrinsic_dimension
+from inference.decoding import get_decoding_params
+from inference.extract import HiddenStateCollector, format_chat_input
+from inference.models import (
     is_gemma,
     load_model_and_tokenizer,
     num_decoder_layers,
     vocab_embedding_matrix,
 )
-from reasoning_manifolds.prompts import format_mmlu_prompt, get_decoding_params
-from reasoning_manifolds.utils import configure_logging, set_seed
+from inference.prompts import format_mmlu_prompt
+from utils import configure_logging, set_seed
 
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
@@ -67,7 +54,6 @@ def run_repeat(
     max_new_tokens: int,
     is_gemma_model: bool,
 ) -> None:
-    """Run one repeat: generate + save last-layer hidden states + predictions."""
     hidden_states_per_sample: list[dict] = []
     predictions: list[dict] = []
 

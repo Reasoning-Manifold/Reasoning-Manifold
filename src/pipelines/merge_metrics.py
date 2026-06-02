@@ -1,27 +1,10 @@
-"""Aggregate per-layer metrics CSVs from a directory tree.
-
-Replaces the family-specific clones:
-    result_qwen3_stride1/merge_data.py
-    result_qwen3_stride1/merge_gemma_data.py
-    result_qwen2_instruct/merge_data.py
-    result_qwen3_debug/integrate_csv.py
-    result_deepseek_stride1/merge_models.py
-
-Each input CSV is expected to have columns
-    layer, intrinsic_dimension, volume, tokens_used, stride
-
-The output CSV adds ``model`` and ``relative_layer = layer / max(layer)``.
-"""
-
-from __future__ import annotations
-
 import argparse
 import re
 from pathlib import Path
 
 import pandas as pd
 
-from reasoning_manifolds.utils import configure_logging
+from utils import configure_logging
 
 
 SIZE_PATTERN = re.compile(r"(\d+\.?\d*)\s*B", re.IGNORECASE)
@@ -33,12 +16,10 @@ def parse_size(model: str) -> float:
 
 
 def collect_csvs(root: Path, glob_pattern: str) -> list[tuple[str, Path]]:
-    """Return ``(model_name, csv_path)`` pairs by matching ``glob_pattern``."""
     out: list[tuple[str, Path]] = []
     for path in sorted(root.rglob(glob_pattern)):
-        # take the parent directory name as the model id, stripped of the
-        # HuggingFace ``models--owner--`` prefix used by the hub cache
         model = path.parent.name
+        # strip the HF hub cache prefix
         if model.startswith("models--"):
             model = model.split("--", 2)[-1]
         out.append((model, path))

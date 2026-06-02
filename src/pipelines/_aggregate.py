@@ -1,17 +1,3 @@
-"""Aggregate worker outputs and compute final metrics (D_stim, V, ℋ).
-
-Reads each worker's ``hs_r{R}.pt`` + ``d_world.json``, computes per-repeat
-``D_stim`` (paper's name for ``D_task``) and information volume ``V`` at the
-final layer, then ℋ via Eq. 15.
-
-Outputs (under ``output_dir``):
-    metrics.json      summary + per-repeat values
-    report.md         human-readable table
-    predictions/      copied per-repeat JSONLs
-"""
-
-from __future__ import annotations
-
 import json
 import logging
 import shutil
@@ -22,7 +8,7 @@ from typing import Any
 import numpy as np
 import torch
 
-from reasoning_manifolds.metrics import (
+from core.metrics import (
     EPSILON_DEFAULT,
     information_volume,
     intrinsic_dimension,

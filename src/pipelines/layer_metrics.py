@@ -1,19 +1,3 @@
-"""Compute per-layer ID and Volume from saved hidden-state .pt files.
-
-This is the analysis half of the layer-wise pipeline (Fig 1, Fig 3B).
-It loads the per-sample tensors written by
-``reasoning_manifolds.pipeline.layerwise`` (each tensor of shape
-``[num_layers, num_tokens, hidden_dim]``) and emits a per-layer CSV with the
-schema used everywhere else in this repo:
-
-    layer, intrinsic_dimension, volume, tokens_used, stride
-
-Replaces ``Layer-ID/cal_id.py`` (with a unified import for ID/Volume from
-``reasoning_manifolds.metrics``).
-"""
-
-from __future__ import annotations
-
 import argparse
 import csv
 import glob
@@ -25,8 +9,8 @@ import numpy as np
 import torch
 from tqdm import tqdm
 
-from reasoning_manifolds.metrics import information_volume, intrinsic_dimension
-from reasoning_manifolds.utils import configure_logging
+from core.metrics import information_volume, intrinsic_dimension
+from utils import configure_logging
 
 logger = logging.getLogger(__name__)
 

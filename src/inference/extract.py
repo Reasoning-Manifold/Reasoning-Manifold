@@ -1,41 +1,16 @@
-"""Hidden-state extraction during autoregressive generation.
-
-The paper takes the *last-token* hidden state at every transformer layer for
-every generation step (§Methods, Eq. 2-3). Two collection modes are needed:
-
-* ``"all_layers"`` — used by Layer-ID experiments to study layer-wise ID/V
-  curves (Fig 1, Fig 3B).
-* ``"last_layer"`` — used by the multi-repeat aggregator to compute
-  ``D_stim`` and ``V`` at the final layer for ℋ.
-
-This module replaces the duplicated hook code in ``intelligence/worker.py``,
-``Layer-ID/hs_layer.py``, ``Layer-ID/hs_layer_gemma.py`` and
-``results/gpqa.py``.
-"""
-
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass, field
 from typing import Sequence
 
 import torch
 
-from reasoning_manifolds.models import get_decoder_layers, num_decoder_layers
+from inference.models import get_decoder_layers, num_decoder_layers
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass
 class HiddenStateCollector:
-    """Capture the last-token hidden state at every selected layer per step.
-
-    For each ``forward`` of the model, the hook reads ``output[:, -1, :]``
-    and stores it on CPU in float32. After ``model.generate`` finishes,
-    ``layer_hs[layer_id]`` is a list with one tensor per step (shape
-    ``[batch, hidden]``).
-    """
-
     model: torch.nn.Module
     layer_ids: Sequence[int]
     layer_hs: dict[int, list[torch.Tensor]] = field(default_factory=dict)
@@ -47,6 +22,7 @@ class HiddenStateCollector:
     def _hook(self, layer_id: int):
         def fn(module, inputs, output):  # noqa: ARG001
             hidden = output[0] if isinstance(output, tuple) else output
+            # last-token hidden state on CPU, float32
             self.layer_hs[layer_id].append(hidden[:, -1, :].detach().cpu().to(torch.float32))
 
         return fn
@@ -67,14 +43,9 @@ class HiddenStateCollector:
             self.layer_hs[layer_id] = []
 
     def as_tensor(self, layer_id: int, *, drop_prefill: bool = True) -> torch.Tensor:
-        """Stack a layer's per-step states into ``[steps, batch, hidden]``.
-
-        Args:
-            drop_prefill: skip step 0 (the prefill forward), matching the
-                convention in ``Layer-ID/hs_layer.py``.
-        """
         states = self.layer_hs[layer_id]
         if drop_prefill:
+            # step 0 is the prefill forward
             states = states[1:]
         if not states:
             return torch.empty(0)
@@ -91,12 +62,8 @@ def format_chat_input(
     *,
     is_gemma: bool = False,
 ) -> dict[str, torch.Tensor]:
-    """Apply the model's chat template and return tokenizer outputs.
-
-    Gemma3 uses a nested message structure; everything else uses the standard
-    HF chat template.
-    """
     if is_gemma:
+        # Gemma3 uses a nested message structure
         messages = [[{"role": "user", "content": [{"type": "text", "text": prompt}]}]]
         out = tokenizer.apply_chat_template(
             messages,

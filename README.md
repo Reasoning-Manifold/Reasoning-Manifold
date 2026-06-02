@@ -1,35 +1,91 @@
-# Reasoning Manifolds
+# Reasoning Emerges from Constrained Inference Manifolds in Large Language Models
 
-Code for the paper **"Reasoning emerges from constrained inference manifolds in large language models"** ([arXiv:2605.08142](https://arxiv.org/abs/2605.08142)).
+<p align="center">
+  <a href="https://arxiv.org/abs/2605.08142"><img src="https://img.shields.io/badge/arXiv-2605.08142-b31b1b?logo=arxiv&logoColor=white" alt="arXiv"></a>
+</p>
 
-We study reasoning in large language models as an intrinsic dynamical process by examining the evolution of internal representations during inference. We find that effective reasoning dynamics emerge within a constrained structural regime characterized by three conditions:
+<p align="center">
+  <img src="assets/figure2.webp" width="100%" />
+</p>
 
-1. **Adequate representational expressivity** — quantified by the intrinsic dimension `D_world` of static vocabulary embeddings.
-2. **Spontaneous manifold compression** — quantified by the stimulus-induced intrinsic dimension `D_stim` of inference-time trajectories.
-3. **Preservation of non-degenerate information volume** — quantified by `V`, the volume of the centred trajectory matrix.
+We study reasoning in large language models as an intrinsic dynamical process by examining the evolution of internal representations during inference. Effective reasoning dynamics emerge within a constrained structural regime characterised by three conditions:
 
-We summarise reasoning health with a single label-free diagnostic (paper Eq. 15):
+1. **Representational expressivity** — `D_world`, the intrinsic dimension of the static vocabulary-embedding matrix.
+2. **Spontaneous manifold compression** — `D_stim`, the stimulus-induced intrinsic dimension of inference-time trajectories at the final layer.
+3. **Preservation of non-degenerate information volume** — `V`, the volume of the centred trajectory matrix at the final layer.
+
+A single label-free diagnostic summarises reasoning health (Eq. 15):
 
 ```
-H = log(D_world) · V / exp(ε · D_stim),   ε = 0.1
+H = log(D_world) · V / exp(ε · D_stim),     ε = 0.1
 ```
 
 ## Installation
 
 ```bash
-https://github.com/Reasoning-Manifold/Reasoning-Manifold
-cd reasoning-manifolds
-pip install -e .
+git clone https://github.com/Reasoning-Manifold/Reasoning-Manifold.git
+cd Reasoning-Manifold
 ```
 
-See [Dependencies](#dependencies) below for the third-party packages this code relies on.
+Pick **one** of the two environment managers below.
 
-## Usage
-
-### Multi-repeat pipeline (D_world / D_stim / V / H at the final layer)
+### Conda
 
 ```bash
-reasoning-manifolds run \
+conda create -n reasoning-manifolds python=3.10 -y
+conda activate reasoning-manifolds
+
+# Install PyTorch (adjust CUDA version as needed)
+pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+
+# Install runtime dependencies
+pip install "accelerate>=1.0" "numpy>=1.26" "pandas>=2.2" \
+            "perceptual-manifold-geometry>=0.1.4" \
+            "tqdm>=4.66" "transformers>=4.45"
+
+cd src   # every command in the rest of this README is run from here
+```
+
+### uv
+
+```bash
+# Install uv (https://docs.astral.sh/uv) if you do not have it yet
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+uv venv --python 3.10
+source .venv/bin/activate
+
+# Install PyTorch (adjust CUDA version as needed)
+uv pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu121
+
+# Install runtime dependencies
+uv pip install "accelerate>=1.0" "numpy>=1.26" "pandas>=2.2" \
+               "perceptual-manifold-geometry>=0.1.4" \
+               "tqdm>=4.66" "transformers>=4.45"
+
+cd src   # every command in the rest of this README is run from here
+```
+
+## Data Format
+
+Stimuli are read from JSONL files. Each line is a single question:
+
+```json
+{"id": "mmlu-other-0", "question": "...", "choices": ["A", "B", "C", "D"], "answer": "B"}
+```
+
+Field aliases are accepted to keep MMLU / AIME / GPQA dumps interchangeable:
+`question | problem | Question`, `answer | solution | ground_truth | Correct Answer`,
+optional `choices`.
+
+## Reproducing Paper Results
+
+### Reasoning health H (multi-model, final layer)
+
+Generate, extract last-layer hidden states across `--repeats` runs, and aggregate `D_world` / `D_stim` / `V` / `H` in one shot:
+
+```bash
+python -m pipelines.run \
     --model Qwen/Qwen3-8B \
     --dataset path/to/stimuli.jsonl \
     --config qwen3 \
@@ -37,49 +93,89 @@ reasoning-manifolds run \
     --output-dir results/qwen3-8b/
 ```
 
-The runner spawns `tp × dp` worker processes, extracts last-token hidden states from the final transformer layer for every generation step, and emits `metrics.json` plus a per-run report containing `D_world`, `D_stim`, `V`, and `H`.
+The launcher spawns `tp × dp` worker processes (one subprocess per `--dp` group of GPUs) and writes:
 
-### Per-layer extraction (for layer-wise analyses)
+```
+results/qwen3-8b/<dataset-stem>/
+├── metrics.json        # D_world, D_stim, V, H — summary + per-repeat
+├── report.md           # human-readable table
+└── predictions/        # per-repeat model completions (JSONL)
+```
+
+Available decoding families: `qwen3`, `qwen2.5`, `deepseek`, `gemma3`, `greedy`
+(parameters mirror those used in the paper).
+
+### Layer-wise ID and V
+
+<p align="center">
+  <img src="assets/figure1.webp" width="100%" />
+</p>
+
+Reproducing the per-layer curves is a three-step pipeline:
 
 ```bash
-python -m reasoning_manifolds.pipeline.layerwise \
+# 1. Dump per-sample, per-layer hidden states
+python -m pipelines.layerwise \
     --model Qwen/Qwen3-8B \
     --dataset path/to/stimuli.jsonl \
     --config qwen3 \
     --output-dir results/layerwise/
 
-python scripts/compute_layerwise_metrics.py \
-    --states-dir results/layerwise/Qwen3-8B/stimuli/states \
-    --output-dir results/layerwise_metrics/
+# 2. Convert .pt dumps into a per-layer ID/V CSV
+python -m pipelines.layer_metrics \
+    --states-dir results/layerwise/Qwen3-8B/<dataset-stem>/states \
+    --output-dir results/layer_metrics/
 
-python scripts/merge_layer_metrics.py \
-    --root  results/layerwise_metrics/ \
-    --glob  '*_metrics.csv' \
-    --output results/qwen3_all_models.csv
+# 3. Merge per-model CSVs into one table
+python -m pipelines.merge_metrics \
+    --root   results/layer_metrics/ \
+    --glob   '*_metrics.csv' \
+    --output results/all_models.csv
 ```
 
-## Repository layout
+## Python API
 
-```
-src/reasoning_manifolds/    core package
-  metrics.py                  TLE-ID, information volume, H (Eq. 15)
-  extract.py                  forward-hook hidden-state collector
-  models.py                   HF model loader (Qwen / DeepSeek / Gemma3)
-  prompts.py                  decoding configs and chat templates
-  data.py                     JSONL stimulus loader
-  pipeline/
-    launcher.py                 multi-GPU runner
-    worker.py                   per-process extractor
-    aggregator.py               D_stim / V / H computation
-    layerwise.py                per-sample per-layer state dump
-scripts/
-  compute_layerwise_metrics.py  per-layer ID/V CSV from .pt dumps
-  merge_layer_metrics.py        merge per-model CSVs into one table
+The three core measures are importable directly (run from `src/`):
+
+```python
+from core import (
+    intrinsic_dimension,   # TLE, k=20
+    information_volume,    # ½ log det( I + (d/m) ZᵀZ )
+    reasoning_health,      # H = log(D_world)·V / exp(ε·D_stim)
+)
+
+D_world = intrinsic_dimension(vocab_embeddings)          # (vocab, hidden)
+D_stim  = intrinsic_dimension(trajectory)                # (tokens, hidden)
+V       = information_volume(trajectory)
+H       = reasoning_health(D_world, D_stim, V)
 ```
 
-## Dependencies
+## Repository Layout
 
-Our experiments are built on the [`perceptual-manifold-geometry`](https://pypi.org/project/perceptual-manifold-geometry/) Python package, which provides geometric analysis tools for high-dimensional data manifolds including intrinsic dimension, curvature, density, and topological structure. It is installed automatically by `pip install -e .`, or directly via `pip install perceptual-manifold-geometry`.
+```
+Reasoning-Manifold/
+├── README.md
+├── LICENSE
+├── pyproject.toml                     dependency manifest (no install required)
+├── assets/                            figures
+└── src/
+    ├── utils.py                       seeding, GPU allocation, logging
+    ├── core/                          the paper's measures and stimuli
+    │   ├── metrics.py                   D_world / D_stim / V / H
+    │   └── data.py                      JSONL stimulus loader
+    ├── inference/                     HF inference-time machinery
+    │   ├── models.py                    model loader (Qwen / DeepSeek / Gemma3)
+    │   ├── decoding.py                  per-family decoding parameters
+    │   ├── prompts.py                   prompt templates (MMLU / GPQA)
+    │   └── extract.py                   forward-hook hidden-state collector
+    └── pipelines/                     CLI entry points
+        ├── run.py                       python -m pipelines.run           multi-GPU launcher
+        ├── _worker.py                     ↳ per-process extractor
+        ├── _aggregate.py                  ↳ D_stim / V / H aggregator
+        ├── layerwise.py                 python -m pipelines.layerwise     per-layer dump
+        ├── layer_metrics.py             python -m pipelines.layer_metrics .pt → CSV
+        └── merge_metrics.py             python -m pipelines.merge_metrics merge CSVs
+```
 
 ## Citation
 
@@ -94,6 +190,10 @@ Our experiments are built on the [`perceptual-manifold-geometry`](https://pypi.o
 }
 ```
 
+## Acknowledgement
+
+The geometric analyses build on the [`perceptual-manifold-geometry`](https://pypi.org/project/perceptual-manifold-geometry/) package for intrinsic-dimension, curvature, and density estimation on high-dimensional point clouds.
+
 ## License
 
-MIT — see `LICENSE`.
+MIT — see [`LICENSE`](LICENSE).

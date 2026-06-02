@@ -1,7 +1,3 @@
-"""Model loading helpers — covers Qwen / DeepSeek (AutoModel) and Gemma3."""
-
-from __future__ import annotations
-
 import logging
 from typing import Tuple
 
@@ -22,18 +18,10 @@ def load_model_and_tokenizer(
     tp_size: int = 1,
     dtype: torch.dtype = torch.bfloat16,
 ) -> Tuple[torch.nn.Module, "AutoTokenizer"]:
-    """Load a HF causal LM with optional tensor parallelism.
-
-    Gemma3 checkpoints are loaded through ``Gemma3ForCausalLM`` because their
-    chat template differs from the AutoModel default (see
-    ``Layer-ID/hs_layer_gemma.py``).
-
-    With ``tp_size > 1`` we attempt to use the optional ``tensor_parallel``
-    package; if missing, we fall back to ``device_map='auto'``.
-    """
     logger.info("Loading model: %s (tp=%d)", model_id, tp_size)
 
     if is_gemma(model_id):
+        # Gemma3's chat template differs from AutoModel default
         from transformers import Gemma3ForCausalLM
 
         model_cls = Gemma3ForCausalLM
@@ -64,7 +52,6 @@ def load_model_and_tokenizer(
 
 
 def get_decoder_layers(model: torch.nn.Module) -> torch.nn.ModuleList:
-    """Return the model's decoder layer list (architecture-agnostic)."""
     if hasattr(model, "model") and hasattr(model.model, "layers"):
         return model.model.layers
     if hasattr(model, "transformer") and hasattr(model.transformer, "h"):
@@ -77,7 +64,6 @@ def num_decoder_layers(model: torch.nn.Module) -> int:
 
 
 def vocab_embedding_matrix(model: torch.nn.Module) -> np.ndarray:
-    """Return ``W_E`` (vocab × hidden) as float64 numpy for ``D_world``."""
     return (
         model.get_input_embeddings()
         .weight.detach()
